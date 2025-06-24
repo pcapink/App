@@ -482,6 +482,7 @@ const translations = {
         someone: 'Someone',
         total: 'Total',
         edit: 'Edit',
+        someAddedKey: 'Some added key',
         letsDoThis: `Let's do this!`,
         letsStart: `Let's start`,
         showMore: 'Show more',
