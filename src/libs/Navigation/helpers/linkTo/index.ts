@@ -52,6 +52,10 @@ export default function linkTo(navigation: NavigationContainerRef<RootNavigatorP
         throw new Error("Couldn't find a navigation object. Is your component inside a screen in a navigator?");
     }
 
+    // Debug: Log what linkTo receives
+    console.log('🔧 [DEBUG] linkTo function called with path:', path);
+    console.log('🔧 [DEBUG] linkTo function called with options:', options);
+
     // We know that the options are always defined because we have default options.
     const {forceReplace} = {...defaultLinkToOptions, ...options} as Required<LinkToOptions>;
 
@@ -120,5 +124,10 @@ export default function linkTo(navigation: NavigationContainerRef<RootNavigatorP
     }
 
     const {action: minimalAction} = getMinimalAction(action, navigation.getRootState());
+    
+    // Debug: Log what action is being dispatched
+    console.log('🔧 [DEBUG] linkTo dispatching action:', minimalAction);
+    console.log('🔧 [DEBUG] linkTo final normalizedPath was:', normalizedPath);
+    
     navigation.dispatch(minimalAction);
 }
