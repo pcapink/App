@@ -286,11 +286,13 @@ function FloatingActionButtonAndPopover({onHideCreateMenu, onShowCreateMenu, isT
                             setModalVisible(true);
                             return;
                         }
+                        const fallbackReportID = generateReportID();
+                        console.log('🐛 Create Expense Debug: ', { fallbackReportID, activePolicyID });
                         startMoneyRequest(
                             CONST.IOU.TYPE.CREATE,
                             // When starting to create an expense from the global FAB, there is not an existing report yet. A random optimistic reportID is generated and used
                             // for all of the routes in the creation flow.
-                            generateReportID(),
+                            fallbackReportID,
                         );
                     }),
             },
@@ -334,28 +336,53 @@ function FloatingActionButtonAndPopover({onHideCreateMenu, onShowCreateMenu, isT
                 },
             ];
         }
-        if (!isEmptyObject(policyChatForActivePolicy)) {
+        
+        // For workspace members, ensure we have a valid policy and workspace chat before showing the QAB
+        if (activePolicy?.isPolicyExpenseChatEnabled && activePolicyID) {
+            // Check if we have a valid workspace chat available
+            const hasValidWorkspaceChat = !isEmptyObject(policyChatForActivePolicy) && 
+                                         policyChatForActivePolicy?.reportID && 
+                                         policyChatForActivePolicy.reportID !== 'undefined';
+
             const onSelected = () => {
                 interceptAnonymousUser(() => {
-                    if (policyChatForActivePolicy?.policyID && shouldRestrictUserBillableActions(policyChatForActivePolicy.policyID)) {
-                        Navigation.navigate(ROUTES.RESTRICTED_ACTION.getRoute(policyChatForActivePolicy.policyID));
+                    if (activePolicyID && shouldRestrictUserBillableActions(activePolicyID)) {
+                        Navigation.navigate(ROUTES.RESTRICTED_ACTION.getRoute(activePolicyID));
                         return;
                     }
 
-                    const quickActionReportID = policyChatForActivePolicy?.reportID || generateReportID();
-                    startMoneyRequest(CONST.IOU.TYPE.SUBMIT, quickActionReportID, CONST.IOU.REQUEST_TYPE.SCAN, true);
+                    // Only proceed if we have a valid workspace chat
+                    if (!hasValidWorkspaceChat) {
+                        return;
+                    }
+
+                    const reportID = policyChatForActivePolicy.reportID;
+                    if (!reportID || reportID === 'undefined' || typeof reportID !== 'string') {
+                        return;
+                    }
+                    
+                    startMoneyRequest(CONST.IOU.TYPE.SUBMIT, reportID, CONST.IOU.REQUEST_TYPE.SCAN, true);
                 });
             };
+
+            // Use the workspace chat name or fallback to workspace name
+            const displayName = hasValidWorkspaceChat 
+                ? getReportName(policyChatForActivePolicy) 
+                : activePolicy?.name || translate('workspace.common.workspace');
+
+            // Show loading state if workspace chat is not ready
+            const description = hasValidWorkspaceChat ? displayName : '...';
 
             return [
                 {
                     ...baseQuickAction,
                     icon: Expensicons.ReceiptScan,
                     text: translate('quickAction.scanReceipt'),
-                    description: getReportName(policyChatForActivePolicy),
+                    description,
                     shouldCallAfterModalHide: shouldUseNarrowLayout,
-                    onSelected,
+                    onSelected: hasValidWorkspaceChat ? onSelected : () => {}, // Disable if not ready
                     shouldShowSubscriptRightAvatar: true,
+                    disabled: !hasValidWorkspaceChat, // Disable the menu item if workspace chat not ready
                 },
             ];
         }
@@ -376,6 +403,10 @@ function FloatingActionButtonAndPopover({onHideCreateMenu, onShowCreateMenu, isT
         isValidReport,
         selectOption,
         shouldUseNarrowLayout,
+        activePolicy,
+        activePolicyID,
+        session?.accountID,
+        allReports,
     ]);
 
     const isTravelEnabled = useMemo(() => {

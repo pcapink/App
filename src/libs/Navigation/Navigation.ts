@@ -150,6 +150,7 @@ function getActiveRoute(): string {
 
     return '';
 }
+
 /**
  * Returns the route of a report opened in RHP.
  */
@@ -198,7 +199,76 @@ function navigate(route: Route, options?: LinkToOptions) {
         return;
     }
 
-    linkTo(navigationRef.current, route, options);
+    // 🔧 SIMPLE DEBUG - Just catch undefined routes
+    console.log('🔧 Navigation.navigate called with route:', route);
+    
+    // Also check if current URL has undefined and fix it immediately
+    if (typeof window !== 'undefined' && window.location.pathname.includes('undefined')) {
+        console.error('🔧 Current URL contains undefined, attempting to fix:', window.location.href);
+        
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pathParam = urlParams.get('path');
+            
+            if (pathParam && !pathParam.includes('undefined')) {
+                console.log('🔧 Fixing current URL with path parameter:', pathParam);
+                const cleanRoute = pathParam.startsWith('/') ? pathParam.substring(1) : pathParam;
+                const newUrl = `${window.location.origin}/${cleanRoute}`;
+                
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', newUrl);
+                }
+                
+                // Use the clean route instead of the broken one
+                route = cleanRoute as Route;
+                console.log('🔧 Updated route to:', route);
+            }
+        } catch (error) {
+            console.error('🔧 Error fixing current URL:', error);
+        }
+    }
+    
+    // Check if route contains undefined and block it
+    if (route.includes('undefined')) {
+        console.error('🔧 BLOCKING undefined route:', route);
+        console.error('🔧 This undefined route was blocked to prevent broken URLs');
+        
+        // Try to use the path parameter from URL as fallback
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pathParam = urlParams.get('path');
+            
+            if (pathParam && !pathParam.includes('undefined')) {
+                console.log('🔧 Using path parameter as fallback:', pathParam);
+                const cleanRoute = pathParam.startsWith('/') ? pathParam.substring(1) : pathParam;
+                
+                // Clear the broken URL and navigate to the correct path
+                if (window.history && window.history.replaceState) {
+                    const newUrl = `${window.location.origin}/${cleanRoute}`;
+                    window.history.replaceState(null, '', newUrl);
+                }
+                
+                console.log('🔧 [DEBUG] linkTo fallback input - cleanRoute:', cleanRoute);
+                console.log('🔧 [DEBUG] linkTo fallback input - options:', options);
+                
+                linkTo(navigationRef, cleanRoute as Route, options);
+                return;
+            }
+        } catch (error) {
+            console.error('🔧 Error trying fallback:', error);
+        }
+        
+        // If we can't fix it, redirect to home
+        console.error('🔧 No valid fallback found, redirecting to home');
+        linkTo(navigationRef, '' as Route, options);
+        return;
+    }
+
+    // Debug: Check what linkTo receives vs outputs
+    console.log('🔧 [DEBUG] linkTo input - route:', route);
+    console.log('🔧 [DEBUG] linkTo input - options:', options);
+    
+    linkTo(navigationRef, route, options);
 }
 
 /**
@@ -477,6 +547,35 @@ function isNavigationReady(): Promise<void> {
 }
 
 function setIsNavigationReady() {
+    // 🔧 Fix any broken URLs on app initialization
+    if (typeof window !== 'undefined' && window.location.pathname.includes('undefined')) {
+        console.error('🔧 App started with broken URL, attempting to fix:', window.location.href);
+        
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pathParam = urlParams.get('path');
+            
+            if (pathParam && !pathParam.includes('undefined')) {
+                console.log('🔧 Fixing startup URL with path parameter:', pathParam);
+                const cleanRoute = pathParam.startsWith('/') ? pathParam.substring(1) : pathParam;
+                const newUrl = `${window.location.origin}/${cleanRoute}`;
+                
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', newUrl);
+                    console.log('🔧 Fixed startup URL to:', newUrl);
+                }
+            } else {
+                // No valid path found, redirect to home
+                console.log('🔧 No valid path found, redirecting to home');
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', window.location.origin);
+                }
+            }
+        } catch (error) {
+            console.error('🔧 Error fixing startup URL:', error);
+        }
+    }
+    
     goToPendingRoute();
     resolveNavigationIsReadyPromise();
 }
